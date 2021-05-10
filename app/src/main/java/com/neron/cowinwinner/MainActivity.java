@@ -1,21 +1,29 @@
 package com.neron.cowinwinner;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.view.View;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.Switch;
 import android.widget.TextView;
+
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,12 +39,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener, OTPDelegate {
+
+    private final List<String> CAPTCHA_FAILURE_ERROR_CODES = Arrays.asList(new String[]{"APPOIN0044", "APPOIN0045"});
 
     private CoWinClient coWinClient;
     private SmsReceiver smsReceiver;
@@ -47,9 +61,16 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private Button otpButton;
     private Switch autoVerifySwitch;
     private int retries = 0;
-    private ArrayList<String> beneficiariesRefId = new ArrayList<>();
+    private ArrayList<Beneficiary> beneficiariesRefId = new ArrayList<>();
     private TextView minAgeTextView;
     private WebView captchaWebView;
+    private TextView captchTextView;
+    private Vibrator vib;
+    private Ringtone ringtone;
+    private TextView captchaStatus;
+    private String lastCaptchaText = "";
+    ChipGroup beneficiaryChipGroup;
+    HashSet<String> bridsSet = new HashSet<>();
 
     public void setTxnId(String txnId) {
         this.txnId = txnId;
@@ -57,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        getSupportActionBar().hide();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         this.coWinClient = new CoWinClient();
@@ -69,8 +91,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         pincodeEt.setText("302020");
         EditText dateEt = findViewById(R.id.date);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-        dateEt.setText(LocalDate.now().format(formatter));
-        dateEt.setText("10-05-2021");
+        dateEt.setText(LocalDate.now().plusDays(1).format(formatter));
         otpButton = findViewById(R.id.otpButton);
         autoVerifySwitch = findViewById(R.id.autoVerifySwitch);
         String token = this.readTokenFromFile(this.getBaseContext());
@@ -79,6 +100,9 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         }
         minAgeTextView = findViewById(R.id.minAge);
         captchaWebView = findViewById(R.id.svgView);
+        captchaStatus = findViewById(R.id.captchaStatus);
+        beneficiaryChipGroup = findViewById(R.id.beneficiaryChips);
+        captchTextView = findViewById(R.id.captchatext);
     }
 
     private void setStatus(String status) {
@@ -148,75 +172,86 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         });
     }
 
+    public void checkSlots() {
+        EditText pincodeEt = findViewById(R.id.pincode);
+        EditText dateEt = findViewById(R.id.date);
+        this.processingSlots = true;
+        MainActivity self = this;
+        Callback callback = new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                self.processingSlots = false;
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.code() == 401) {
+                    self.verificationFailed();
+                }
+                if (response.isSuccessful()) {
+                    JSONObject jsonObject;
+                    try {
+                        jsonObject = new JSONObject(response.body().string());
+                        boolean slotFound = false;
+                        JSONArray centers = (JSONArray)jsonObject.get("centers");
+                        String centerString = "";
+                        for (int i = 0; i < centers.length(); i++) {
+                            JSONObject center = centers.getJSONObject(i);
+                            JSONArray sessions = center.getJSONArray("sessions");
+                            for (int j = 0; j <sessions.length(); j++) {
+                                JSONObject session = sessions.getJSONObject(j);
+                                int minAge;
+                                try {
+                                    minAge = Integer.parseInt(minAgeTextView.getText().toString());
+                                } catch (Exception ex) {
+                                    minAge = 18;
+                                }
+                                if (session.getInt("min_age_limit") == minAge && session.getInt("available_capacity") > 0) {
+                                    slotFound = true;
+                                    self.onSlotFound(center.getString("center_id"), session);
+                                }
+                            }
+                            centerString += (i+1) + ". " + center.getString("name") + "\n";
+                        }
+                        if (!slotFound) {
+                            setStatus("No slot found\n" +
+                                    "Last checked at " + LocalDateTime.now() + "\n" +
+                                    "Centers checked : \n" + centerString);
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+                self.processingSlots = false;
+            }
+        };
+        self.coWinClient.getSlots(pincodeEt.getText().toString(), dateEt.getText().toString(), self.authToken, callback);
+        while (self.processingSlots) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     @Override
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
         if (isChecked) {
-            MainActivity self = this;
             Runnable r = () -> {
                 Switch aSwitch = findViewById(R.id.switch1);
+                int counter = 0;
                 while (aSwitch.isChecked()) {
-                    EditText pincodeEt = findViewById(R.id.pincode);
-                    EditText dateEt = findViewById(R.id.date);
-                    self.processingSlots = true;
-                    Callback callback = new Callback() {
-                        @Override
-                        public void onFailure(Call call, IOException e) {
-                            self.processingSlots = false;
-                        }
-
-                        @Override
-                        public void onResponse(Call call, Response response) throws IOException {
-                            if (response.code() == 401) {
-                                self.verificationFailed();
-                            }
-                            if (response.isSuccessful()) {
-                                JSONObject jsonObject;
-                                try {
-                                    jsonObject = new JSONObject(response.body().string());
-                                    boolean slotFound = false;
-                                    JSONArray centers = (JSONArray)jsonObject.get("centers");
-                                    String centerString = "";
-                                    for (int i = 0; i < centers.length(); i++) {
-                                        JSONObject center = centers.getJSONObject(i);
-                                        JSONArray sessions = center.getJSONArray("sessions");
-                                        for (int j = 0; j <sessions.length(); j++) {
-                                            JSONObject session = sessions.getJSONObject(j);
-                                            int minAge;
-                                            try {
-                                                minAge = Integer.parseInt(minAgeTextView.getText().toString());
-                                            } catch (Exception ex) {
-                                                minAge = 18;
-                                            }
-                                            if (session.getInt("min_age_limit") == minAge && session.getInt("available_capacity") > 0) {
-                                                slotFound = true;
-                                                self.onSlotFound(center.getString("center_id"), session);
-                                            }
-                                        }
-                                        centerString += (i+1) + ". " + center.getString("name") + "\n";
-                                    }
-                                    if (!slotFound) {
-                                        setStatus("No slot found\n" +
-                                                "Last checked at " + LocalDateTime.now() + "\n" +
-                                                "Centers checked : \n" + centerString);
-                                    }
-                                } catch (JSONException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                            self.processingSlots = false;
-                        }
-                    };
-                    if (verified) {
-                        self.coWinClient.getSlots(pincodeEt.getText().toString(), dateEt.getText().toString(), self.authToken, callback);
-                    } else {
-                        self.coWinClient.getSlots(pincodeEt.getText().toString(), dateEt.getText().toString(), callback);
+                    counter++;
+                    checkSlots();
+                    if (counter % 5 == 0) {
+                        validateCaptcha();
+                        fetchBeneficiary(null);
                     }
-                    while (self.processingSlots) {
-                        try {
-                            Thread.sleep(2000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
             };
@@ -245,6 +280,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     JSONObject jsonObject = null;
                     try {
                         jsonObject = new JSONObject(response.body().string());
+                        setStatus("Verified ✅");
                         self.onVerification((jsonObject.getString("token")));
                     } catch (JSONException e) {
                         e.printStackTrace();
@@ -257,8 +293,42 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         });
     }
 
+    private void validateCaptcha() {
+        String captcha = captchTextView.getText().toString();
+        try {
+            this.coWinClient.validateCaptcha(this.authToken, captcha, new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                }
+
+                @RequiresApi(api = Build.VERSION_CODES.Q)
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    validateResponse(response);
+                    try {
+                        JSONObject responseObject = new JSONObject(response.body().string());
+                        if (CAPTCHA_FAILURE_ERROR_CODES.contains(responseObject.getString("errorCode"))) {
+                            setCaptchaStatus(false);
+                            refreshCaptcha();
+                        } else {
+                            setCaptchaStatus(true);
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        } catch (JSONException e) {
+            setStatus("Error while validating captcha" +
+                    e.getMessage());
+        }
+    }
+
     public void fetchBeneficiary(View view) {
-        this.beneficiariesRefId = new ArrayList<>();
+        if (!verified) {
+            return;
+        }
         this.coWinClient.getBeneficiaries(this.authToken, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -266,9 +336,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (response.code() == 401) {
-                    verificationFailed();
-                }
+                validateResponse(response);
                 if (response.isSuccessful()) {
                     try {
                         JSONObject jsonObject = new JSONObject(response.body().string());
@@ -276,15 +344,29 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                         JSONArray beneficiaries = jsonObject.getJSONArray("beneficiaries");
                         for (int i = 0; i < beneficiaries.length(); i++) {
                             JSONObject beneficiary = beneficiaries.getJSONObject(i);
-                            if (!beneficiariesRefId.contains(beneficiary.getString("beneficiary_reference_id")) && beneficiary.getString("vaccination_status").equals("Not Vaccinated")) {
-                                beneficiariesRefId.add(beneficiary.getString("beneficiary_reference_id"));
+                            String brid = beneficiary.getString("beneficiary_reference_id");
+                            if (!bridsSet.contains(brid)) {
                                 beneficiariesString = beneficiariesString + (i+1) + ". " + beneficiary.getString("name");
+                                beneficiariesRefId.add(new Beneficiary(beneficiary.getString("name"),
+                                        beneficiary.getString("beneficiary_reference_id"),
+                                        beneficiary.getString("vaccination_status")));
+                                bridsSet.add(brid);
                             }
                         }
-                        String finalBeneficiariesString = beneficiariesString;
                         runOnUiThread(() -> {
-                            TextView beneficiariesView = findViewById(R.id.beneficiaries);
-                            beneficiariesView.setText(finalBeneficiariesString);
+                            otpButton.setText("Verified ✔️");
+                            otpButton.setEnabled(false);
+                            for (Beneficiary b : beneficiariesRefId) {
+                                if (b.chip == null) {
+                                    Chip c = new Chip(beneficiaryChipGroup.getContext());
+                                    c.setText(b.name);
+                                    c.setCloseIconVisible(false);
+                                    c.setCheckable(true);
+                                    c.setChecked(true);
+                                    beneficiaryChipGroup.addView(c);
+                                    b.chip = c;
+                                }
+                            }
                         });
                     } catch (JSONException e) {
                         e.printStackTrace();
@@ -292,7 +374,6 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                 }
             }
         });
-        fetchCaptcha(view);
     }
 
     public void fetchCaptcha(View view) {
@@ -304,9 +385,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (response.code() == 401) {
-                    self.verificationFailed();
-                }
+                validateResponse(response);
                 if (response.isSuccessful()) {
                     JSONObject jsonObject = null;
                     try {
@@ -314,21 +393,19 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                         String svgString = jsonObject.getString("captcha");
                         runOnUiThread(() -> {
                             captchaWebView.loadDataWithBaseURL("file://android_assest", svgString, "text/html", "UTF-8", null);
-                            captchaWebView.setWebViewClient(new WebViewClient() {
-                                @Override
-                                public void onPageCommitVisible (WebView view, String url) {
-                                    try {
-                                        Thread.sleep(5000);
-                                    } catch (InterruptedException e) {
-                                        e.printStackTrace();
-                                    }
-                                    solveCaptcha();
-                                }
-                            });
+                            captchTextView.requestFocus();
                         });
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
+                }
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    if (ringtone != null) ringtone.stop();
+                    if (vib != null) vib.cancel();
                 }
             }
         });
@@ -338,11 +415,6 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         verified = true;
         this.authToken = token;
         this.writeTokenToFile(token, this.getBaseContext());
-        setStatus("Verified 🙂");
-        runOnUiThread(() -> {
-            otpButton.setText("Verified ✔️");
-            otpButton.setEnabled(false);
-        });
         MainActivity self = this;
         Runnable r = () -> {
             try {
@@ -351,6 +423,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                 e.printStackTrace();
             }
             self.fetchBeneficiary(null);
+            self.fetchCaptcha(null);
         };
         new Thread(r).start();
     }
@@ -370,6 +443,9 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
+                } else {
+                    Switch aSwitch = findViewById(R.id.switch1);
+                    aSwitch.setChecked(false);
                 }
             });
         }
@@ -382,7 +458,8 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         for (int k = 0; k < slots.length(); k++) {
             String slot = slots.getString(k);
             String captcha = ((TextView)findViewById(R.id.captchatext)).getText().toString();
-            this.coWinClient.bookSlot(1, captcha, centerId, sessionId, slot, beneficiariesRefId, this.authToken, new Callback() {
+            List<String> bList = beneficiariesRefId.stream().filter(b -> b.chip.isChecked()).map(b -> b.id).collect(Collectors.toList());
+            this.coWinClient.bookSlot(1, captcha, centerId, sessionId, slot, bList, this.authToken, new Callback() {
 
                 @Override
                 public void onFailure(Call call, IOException e) {
@@ -392,9 +469,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    if (response.code() == 401) {
-                        verificationFailed();
-                    }
+                    validateResponse(response);
                     if (response.isSuccessful()) {
                         setStatus("Slot Booked");
                     } else {
@@ -442,5 +517,34 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
             e.printStackTrace();
         }
         return ret;
+    }
+
+    private void setCaptchaStatus(boolean status) {
+        runOnUiThread(() -> {
+            captchaStatus.setText(status ? "✅" : "❌");
+            if (!status) {
+                Switch aSwitch = findViewById(R.id.switch1);
+                aSwitch.setChecked(false);
+            }
+        });
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.Q)
+    private void refreshCaptcha() {
+        lastCaptchaText = captchTextView.getText().toString();
+        if (ringtone == null || !ringtone.isPlaying()) {
+            ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getActualDefaultRingtoneUri(getApplicationContext(), RingtoneManager.TYPE_RINGTONE));
+            vib = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            long[] pattern = {1500, 800, 800, 800};
+            vib.vibrate(VibrationEffect.createWaveform(pattern, 0));
+            ringtone.play();
+        }
+        this.fetchCaptcha(null);
+    }
+
+    private void validateResponse(Response response) {
+        if (response.code() == 401) {
+            verificationFailed();
+        }
     }
 }

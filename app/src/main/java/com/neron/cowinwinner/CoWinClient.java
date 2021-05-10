@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.List;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -72,7 +73,7 @@ public class CoWinClient {
         call.enqueue(callback);
     }
 
-    public void getSlots(String pincode, String date, Callback callback) {
+    public Call getSlots(String pincode, String date, Callback callback) {
         OkHttpClient client = new OkHttpClient().newBuilder()
                 .build();
         Request request = new Request.Builder()
@@ -82,6 +83,7 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
+        return call;
     }
 
     public Call getSlots(String pincode, String date, String token, Callback callback) {
@@ -110,10 +112,10 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
-        return call
+        return call;
     }
 
-    public Call bookSlot(int dose, String captcha, String centerId, String sessionId, String slot, ArrayList<String> beneficiaries, String authToken, Callback callback) throws JSONException {
+    public Call bookSlot(int dose, String captcha, String centerId, String sessionId, String slot, List<String> beneficiaries, String authToken, Callback callback) throws JSONException {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("dose", dose);
@@ -130,7 +132,6 @@ public class CoWinClient {
                 .addHeader("authorization", "Bearer " + authToken)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36")
-
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
@@ -150,5 +151,29 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
+    }
+
+    public Call validateCaptcha(String authToken, String captcha, Callback callback) throws JSONException {
+        MediaType mediaType = MediaType.parse("application/json");
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("dose", 1);
+        jsonObject.put("session_id", "2b8bdf32-14a5-4840-a936-70337563acca");
+        jsonObject.put("slot", "11:00AM-01:00PM");
+        jsonObject.put("beneficiaries", new JSONArray("[\"73736258463880\"]"));
+        jsonObject.put("center_id", 411587);
+        jsonObject.put("captcha", captcha);
+        RequestBody body = RequestBody.create(mediaType, jsonObject.toString());
+        Request request = new Request.Builder()
+                .url("https://cdn-api.co-vin.in/api/v2/appointment/schedule")
+                .method("POST", body)
+                .addHeader("accept", "application/json")
+                .addHeader("authorization", "Bearer " + authToken)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36")
+                .build();
+        Call call = this.httpClient.newCall(request);
+        call.enqueue(callback);
+        return call;
+
     }
 }
