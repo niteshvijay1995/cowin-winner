@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private Ringtone ringtone;
     private TextView captchaStatus;
     private EditText phoneNumberEditText;
-    private String lastCaptchaText = "";
+    private Switch aSwitch;
     ChipGroup beneficiaryChipGroup;
     HashSet<String> bridsSet = new HashSet<>();
     UserAuth userAuth;
@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS}, PackageManager.PERMISSION_GRANTED);
         smsReceiver = new SmsReceiver();
         smsReceiver.otpDelegate = this;
-        Switch aSwitch = findViewById(R.id.switch1);
+        aSwitch = findViewById(R.id.switch1);
         aSwitch.setOnCheckedChangeListener(this);
         EditText pincodeEt = findViewById(R.id.pincode);
         pincodeEt.setText("302020");
@@ -485,6 +485,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     validateResponse(response);
                     if (response.isSuccessful()) {
                         setStatus("Slot Booked");
+                        aSwitch.setChecked(false);
                     } else {
                         setStatus("Failed to book slot\n" +
                                 response.body().string());
@@ -506,7 +507,6 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
     @RequiresApi(api = Build.VERSION_CODES.Q)
     private void refreshCaptcha() {
-        lastCaptchaText = captchTextView.getText().toString();
         if (ringtone == null || !ringtone.isPlaying()) {
             ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getActualDefaultRingtoneUri(getApplicationContext(), RingtoneManager.TYPE_RINGTONE));
             vib = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
