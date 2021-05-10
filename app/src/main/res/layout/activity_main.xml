@@ -35,7 +35,7 @@
         android:layout_marginStart="10dp"
         android:layout_marginTop="20dp"
         android:ems="10"
-        android:hint="Phone Number"
+        android:hint="Mobile Number"
         android:inputType="phone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView" />
@@ -57,7 +57,8 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:layout_marginTop="10dp"
-        android:text="Switch"
+        android:text="Look Out"
+        android:textColor="#009688"
         android:textOff="OFF"
         android:textOn="ON"
         app:layout_constraintStart_toStartOf="parent"
@@ -93,8 +94,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
+        android:layout_marginTop="15dp"
         android:fontFamily="sans-serif-medium"
-        android:text="Look out for empty slot"
+        android:text="Book empty slot"
+        android:textColor="#009688"
         android:textSize="18sp"
         android:textStyle="bold"
         android:typeface="monospace"
@@ -103,7 +106,7 @@
 
     <TextView
         android:id="@+id/statusView"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:layout_marginTop="10dp"
@@ -140,11 +143,13 @@
         android:id="@+id/autoVerifySwitch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="5dp"
         android:layout_marginTop="8dp"
+        android:splitTrack="false"
         android:text="Auto"
         app:layout_constraintStart_toEndOf="@+id/otpButton"
-        app:layout_constraintTop_toTopOf="@+id/otpButton" />
+        app:layout_constraintTop_toTopOf="@+id/otpButton"
+        tools:checked="true" />
 
     <TextView
         android:id="@+id/textView3"
@@ -164,8 +169,12 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
+        android:layout_marginTop="10dp"
         android:layout_marginEnd="10dp"
         android:text="Select beneficiary"
+        android:textColor="#009688"
+        android:textSize="18sp"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="1.0"
         app:layout_constraintStart_toStartOf="parent"
@@ -177,7 +186,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:ems="10"
-        android:hint="Catcha"
+        android:hint="Captcha"
         android:inputType="textPersonName"
         app:layout_constraintTop_toBottomOf="@+id/svgView"
         tools:layout_editor_absoluteX="10dp" />
@@ -188,7 +197,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:onClick="fetchBeneficiary"
-        android:text="Fetch Beneficiary"
+        android:text="Refresh"
         app:layout_constraintBottom_toBottomOf="@+id/switch1"
         app:layout_constraintStart_toEndOf="@+id/switch1"
         app:layout_constraintTop_toTopOf="@+id/switch1" />
@@ -223,7 +232,7 @@
         android:id="@+id/captchaStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="!"
+        android:text="！"
         app:layout_constraintBottom_toBottomOf="@+id/captchatext"
         app:layout_constraintStart_toEndOf="@+id/captchatext"
         app:layout_constraintTop_toTopOf="@+id/captchatext" />
@@ -238,6 +247,26 @@
         app:layout_constraintTop_toBottomOf="@+id/beneficiaries">
 
     </com.google.android.material.chip.ChipGroup>
+
+    <TextView
+        android:id="@+id/textView6"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Made with ❤️ by Nitesh Vijay"
+        android:textAlignment="center"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/captchatext" />
+
+    <TextView
+        android:id="@+id/textView7"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Minimum Age"
+        app:layout_constraintBottom_toTopOf="@+id/minAge"
+        app:layout_constraintEnd_toEndOf="@+id/minAge"
+        app:layout_constraintStart_toStartOf="@+id/minAge" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>
