@@ -4,9 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.List;
 
 import okhttp3.Call;
@@ -71,19 +69,6 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
-    }
-
-    public Call getSlots(String pincode, String date, Callback callback) {
-        OkHttpClient client = new OkHttpClient().newBuilder()
-                .build();
-        Request request = new Request.Builder()
-                .url("https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByPin?pincode=" + pincode + "&date=" + date)
-                .method("GET", null)
-                .header("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36")
-                .build();
-        Call call = this.httpClient.newCall(request);
-        call.enqueue(callback);
-        return call;
     }
 
     public Call getSlots(String pincode, String date, String token, Callback callback) {
