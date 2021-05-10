@@ -14,7 +14,6 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.WebView;
 import android.widget.Button;
@@ -59,7 +58,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private ArrayList<Beneficiary> beneficiariesRefId = new ArrayList<>();
     private TextView minAgeTextView;
     private WebView captchaWebView;
-    private TextView captchTextView;
+    private TextView captchaTextView;
     private Vibrator vib;
     private Ringtone ringtone;
     private TextView captchaStatus;
@@ -95,7 +94,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         captchaWebView = findViewById(R.id.svgView);
         captchaStatus = findViewById(R.id.captchaStatus);
         beneficiaryChipGroup = findViewById(R.id.beneficiaryChips);
-        captchTextView = findViewById(R.id.captchatext);
+        captchaTextView = findViewById(R.id.captchatext);
         phoneNumberEditText = findViewById(R.id.phoneNumberInput);
         autoVerifySwitch.setChecked(true);
         loadUserAuthFromPersistenceStore();
@@ -308,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     }
 
     private void validateCaptcha() {
-        String captcha = captchTextView.getText().toString();
+        String captcha = captchaTextView.getText().toString();
         try {
             this.coWinClient.validateCaptcha(userAuth.token, captcha, new Callback() {
                 @Override
@@ -406,7 +405,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                         String svgString = jsonObject.getString("captcha");
                         runOnUiThread(() -> {
                             captchaWebView.loadDataWithBaseURL("file://android_assest", svgString, "text/html", "UTF-8", null);
-                            captchTextView.requestFocus();
+                            captchaTextView.requestFocus();
                         });
                     } catch (JSONException e) {
                         e.printStackTrace();
