@@ -6,12 +6,8 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Picture;
 import android.os.Bundle;
 import android.os.CountDownTimer;
-import android.support.annotation.NonNull;
 import android.view.View;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -21,22 +17,12 @@ import android.widget.EditText;
 import android.widget.Switch;
 import android.widget.TextView;
 
-
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
-import com.google.mlkit.vision.common.InputImage;
-import com.google.mlkit.vision.text.Text;
-import com.google.mlkit.vision.text.TextRecognition;
-import com.google.mlkit.vision.text.TextRecognizer;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -77,36 +63,33 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS}, PackageManager.PERMISSION_GRANTED);
         smsReceiver = new SmsReceiver();
         smsReceiver.otpDelegate = this;
-        Switch aSwitch = (Switch)findViewById(R.id.switch1);
+        Switch aSwitch = findViewById(R.id.switch1);
         aSwitch.setOnCheckedChangeListener(this);
-        EditText pincodeEt = (EditText) findViewById(R.id.pincode);
+        EditText pincodeEt = findViewById(R.id.pincode);
         pincodeEt.setText("302020");
-        EditText dateEt = (EditText) findViewById(R.id.date);
+        EditText dateEt = findViewById(R.id.date);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
         dateEt.setText(LocalDate.now().format(formatter));
         dateEt.setText("10-05-2021");
-        otpButton = (Button)findViewById(R.id.otpButton);
-        autoVerifySwitch = (Switch)findViewById(R.id.autoVerifySwitch);
+        otpButton = findViewById(R.id.otpButton);
+        autoVerifySwitch = findViewById(R.id.autoVerifySwitch);
         String token = this.readTokenFromFile(this.getBaseContext());
         if (token != null) {
             onVerification(token);
         }
-        minAgeTextView = (TextView)findViewById(R.id.minAge);
-        captchaWebView = (WebView)findViewById(R.id.svgView);
+        minAgeTextView = findViewById(R.id.minAge);
+        captchaWebView = findViewById(R.id.svgView);
     }
 
     private void setStatus(String status) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                TextView statusView = (TextView)findViewById(R.id.statusView);
-                statusView.setText(status);
-            }
+        runOnUiThread(() -> {
+            TextView statusView = findViewById(R.id.statusView);
+            statusView.setText(status);
         });
     }
 
     public void sendOtp(View view) throws JSONException {
-        EditText et = (EditText) findViewById(R.id.phoneNumberInput);
+        EditText et = findViewById(R.id.phoneNumberInput);
         String mobileNumber = et.getText().toString();
         if (mobileNumber.length() != 10) {
             setStatus("Phone number is not valid!!");
@@ -119,12 +102,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
             @Override
             public void onFailure(Call call, IOException e) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        button.setEnabled(true);
-                    }
-                });
+                runOnUiThread(() -> button.setEnabled(true));
             }
 
             @Override
@@ -175,10 +153,10 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         if (isChecked) {
             MainActivity self = this;
             Runnable r = () -> {
-                Switch aSwitch = (Switch)findViewById(R.id.switch1);
+                Switch aSwitch = findViewById(R.id.switch1);
                 while (aSwitch.isChecked()) {
-                    EditText pincodeEt = (EditText) findViewById(R.id.pincode);
-                    EditText dateEt = (EditText) findViewById(R.id.date);
+                    EditText pincodeEt = findViewById(R.id.pincode);
+                    EditText dateEt = findViewById(R.id.date);
                     self.processingSlots = true;
                     Callback callback = new Callback() {
                         @Override
@@ -192,7 +170,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                                 self.verificationFailed();
                             }
                             if (response.isSuccessful()) {
-                                JSONObject jsonObject = null;
+                                JSONObject jsonObject;
                                 try {
                                     jsonObject = new JSONObject(response.body().string());
                                     boolean slotFound = false;
@@ -203,7 +181,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                                         JSONArray sessions = center.getJSONArray("sessions");
                                         for (int j = 0; j <sessions.length(); j++) {
                                             JSONObject session = sessions.getJSONObject(j);
-                                            int minAge = 18;
+                                            int minAge;
                                             try {
                                                 minAge = Integer.parseInt(minAgeTextView.getText().toString());
                                             } catch (Exception ex) {
@@ -305,7 +283,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                         }
                         String finalBeneficiariesString = beneficiariesString;
                         runOnUiThread(() -> {
-                            TextView beneficiariesView = (TextView)findViewById(R.id.beneficiaries);
+                            TextView beneficiariesView = findViewById(R.id.beneficiaries);
                             beneficiariesView.setText(finalBeneficiariesString);
                         });
                     } catch (JSONException e) {
@@ -465,49 +443,4 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         }
         return ret;
     }
-
-    private void solveCaptcha() {
-
-        Picture picture = captchaWebView.capturePicture();
-        Bitmap b = Bitmap.createBitmap(picture.getWidth(), picture.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        picture.draw(c);
-        InputImage image = InputImage.fromBitmap(b, 90);
-        TextRecognizer recognizer = TextRecognition.getClient();
-        Task<Text> result =
-                recognizer.process(image)
-                        .addOnSuccessListener(visionText -> System.out.println(visionText.getText()))
-                        .addOnFailureListener(
-                                e -> {
-                                    // Task failed with an exception
-                                    // ...
-                                });
-    }
-
-//    private void saveCaptcha(Document document) throws FileNotFoundException, TranscoderException {
-//        JPEGTranscoder transcoder = new JPEGTranscoder();
-//        transcoder.addTranscodingHint(JPEGTranscoder.KEY_XML_PARSER_CLASSNAME,
-//                "org.apache.crimson.parser.XMLReaderImpl");
-//        transcoder.addTranscodingHint(JPEGTranscoder.KEY_QUALITY,
-//                new Float(1.0));
-//        TranscoderInput input = new TranscoderInput(document);
-//        OutputStream ostream = new FileOutputStream("out.jpg");
-//        TranscoderOutput output = new TranscoderOutput(ostream);
-//
-//        transcoder.transcode(input, output);
-//    }
-
-//    private Document convertStringToDocument(String xmlStr) {
-//        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-//        DocumentBuilder builder;
-//        try
-//        {
-//            builder = factory.newDocumentBuilder();
-//            Document doc = builder.parse( new InputSource( new StringReader( xmlStr ) ) );
-//            return doc;
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
 }

@@ -84,7 +84,7 @@ public class CoWinClient {
         call.enqueue(callback);
     }
 
-    public void getSlots(String pincode, String date, String token, Callback callback) {
+    public Call getSlots(String pincode, String date, String token, Callback callback) {
         Request request = new Request.Builder()
                 .url("https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByPin?pincode=" + pincode + "&date=" + date)
                 .method("GET", null)
@@ -95,9 +95,10 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
+        return call;
     }
 
-    public void getBeneficiaries(String token, Callback callback) {
+    public Call getBeneficiaries(String token, Callback callback) {
         this.httpClient = new OkHttpClient().newBuilder()
                 .build();
         Request request = new Request.Builder()
@@ -109,9 +110,10 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
+        return call
     }
 
-    public void bookSlot(int dose, String captcha, String centerId, String sessionId, String slot, ArrayList<String> beneficiaries, String authToken, Callback callback) throws JSONException {
+    public Call bookSlot(int dose, String captcha, String centerId, String sessionId, String slot, ArrayList<String> beneficiaries, String authToken, Callback callback) throws JSONException {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("dose", dose);
@@ -132,6 +134,7 @@ public class CoWinClient {
                 .build();
         Call call = this.httpClient.newCall(request);
         call.enqueue(callback);
+        return call;
     }
 
     public void getCaptcha(String authToken, Callback callback) {
